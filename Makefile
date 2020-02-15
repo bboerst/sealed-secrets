@@ -37,7 +37,7 @@ ifneq ($(DIRTY),)
 VERSION := $(VERSION)+dirty
 endif
 
-GO_LD_FLAGS = -X main.VERSION=$(VERSION)
+GO_LD_FLAGS = -w -s -X main.VERSION=$(VERSION)
 
 all: controller kubeseal
 
@@ -45,13 +45,13 @@ generate: $(GO_FILES)
 	$(GO) generate $(GO_PACKAGES)
 
 controller: $(GO_FILES)
-	$(GO) build -o $@ $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/controller
+	GOOS=linux GOARCH=${ARCH} $(GO) build -o $@ $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/controller
 
 kubeseal: $(GO_FILES)
-	$(GO) build -o $@ $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/kubeseal
+	GOOS=linux GOARCH=${ARCH} $(GO) build -o $@ $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/kubeseal
 
 %-static: $(GO_FILES)
-	CGO_ENABLED=0 $(GO) build -o $@ -installsuffix cgo $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/$*
+	GOOS=linux GOARCH=${ARCH} $(GO) build -o $@ -installsuffix cgo $(GO_FLAGS) -ldflags "$(GO_LD_FLAGS)" ./cmd/$*
 
 docker/controller: controller-static
 	cp $< $@
@@ -91,3 +91,8 @@ clean:
 	$(RM) docker/controller
 
 .PHONY: all kubeseal controller test clean vet fmt
+
+.PHONY: build.image.multiarch
+# linux/amd64,linux/arm64,
+build.image.multiarch:
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t bboerst/sealed-secrets-controller:latest-multiarch -f docker/Dockerfile.build . --push
